@@ -12,6 +12,7 @@ app.get('/', (req, res) => {
     res.json({
         message: 'Chào mừng đến với ứng dụng Node.js của tôi!',
         status: 'success',
+        platform: 'Vercel',
         timestamp: new Date().toISOString()
     });
 });
@@ -21,7 +22,8 @@ app.get('/api/health', (req, res) => {
     res.json({
         status: 'healthy',
         uptime: process.uptime(),
-        memory: process.memoryUsage()
+        memory: process.memoryUsage(),
+        platform: 'Vercel Serverless'
     });
 });
 
@@ -43,7 +45,7 @@ app.post('/api/echo', (req, res) => {
     });
 });
 
-// Biến để theo dõi bandwidth
+// Biến để theo dõi bandwidth (Simplified for serverless)
 let bandwidthStats = {
     totalRequests: 0,
     totalBytesIn: 0,
@@ -52,7 +54,7 @@ let bandwidthStats = {
     requestsLog: []
 };
 
-// Middleware để theo dõi bandwidth
+// Middleware để theo dõi bandwidth (Simplified)
 app.use((req, res, next) => {
     const startTime = Date.now();
     const originalSend = res.send;
@@ -67,7 +69,7 @@ app.use((req, res, next) => {
         const responseSize = Buffer.byteLength(data || '', 'utf8');
         bandwidthStats.totalBytesOut += responseSize;
         
-        // Log request details
+        // Log request details (keep last 10 only for serverless)
         bandwidthStats.requestsLog.push({
             timestamp: new Date().toISOString(),
             method: req.method,
@@ -77,9 +79,9 @@ app.use((req, res, next) => {
             responseTime: Date.now() - startTime
         });
         
-        // Keep only last 100 requests to prevent memory issues
-        if (bandwidthStats.requestsLog.length > 100) {
-            bandwidthStats.requestsLog = bandwidthStats.requestsLog.slice(-100);
+        // Keep only last 10 requests for serverless
+        if (bandwidthStats.requestsLog.length > 10) {
+            bandwidthStats.requestsLog = bandwidthStats.requestsLog.slice(-10);
         }
         
         return originalSend.call(this, data);
@@ -88,103 +90,60 @@ app.use((req, res, next) => {
     next();
 });
 
-// Route để xem thông tin disk
+// Route để xem thông tin disk (Simplified for Vercel)
 app.get('/api/disk-info', async (req, res) => {
-    const fs = require('fs').promises;
-    const path = require('path');
-    const { execSync } = require('child_process');
-    
     try {
-        // Function to get directory size recursively
-        const getDirectorySize = async (dirPath) => {
-            let size = 0;
-            try {
-                const files = await fs.readdir(dirPath, { withFileTypes: true });
-                for (const file of files) {
-                    const filePath = path.join(dirPath, file.name);
-                    if (file.isDirectory() && !file.name.startsWith('.')) {
-                        size += await getDirectorySize(filePath);
-                    } else {
-                        try {
-                            const stats = await fs.stat(filePath);
-                            size += stats.size;
-                        } catch (err) {
-                            // Skip inaccessible files
-                        }
-                    }
-                }
-            } catch (err) {
-                // Skip inaccessible directories
-            }
-            return size;
-        };
-        
-        const appSize = await getDirectorySize(process.cwd());
-        
-        // Try to get system disk info (may not work on all hosting platforms)
-        let diskInfo = null;
-        try {
-            diskInfo = execSync('df -h /', { encoding: 'utf8', timeout: 5000 });
-        } catch (err) {
-            diskInfo = `Could not retrieve disk info: ${err.message}`;
-        }
-        
+        // Simplified disk info for serverless environment
         res.json({
             disk_usage: {
-                app_size_bytes: appSize,
-                app_size_mb: (appSize / 1024 / 1024).toFixed(2),
-                app_size_gb: (appSize / 1024 / 1024 / 1024).toFixed(3),
-                render_limit_gb: 1,
-                usage_percentage: ((appSize / (1024 * 1024 * 1024)) * 100).toFixed(2) + '%'
+                note: "Vercel uses serverless functions - no persistent disk storage",
+                function_memory_limit: "1024 MB",
+                function_timeout: "30 seconds (Hobby plan)",
+                vercel_limits: {
+                    function_size: "50 MB",
+                    deployment_size: "100 MB",
+                    bandwidth: "100 GB/month"
+                }
             },
             system_info: {
-                current_directory: process.cwd(),
-                disk_command_output: diskInfo,
                 platform: process.platform,
-                architecture: process.arch
+                architecture: process.arch,
+                node_version: process.version,
+                vercel_region: process.env.VERCEL_REGION || 'unknown'
             },
-            files_breakdown: {
-                note: "Check individual directories for detailed breakdown"
-            }
+            memory_usage: process.memoryUsage()
         });
         
     } catch (error) {
         res.status(500).json({
             error: "Could not retrieve disk information",
             message: error.message,
-            fallback_info: {
-                current_directory: process.cwd(),
-                render_free_plan_limit: "1 GB SSD"
-            }
+            note: "Vercel uses serverless functions without persistent storage"
         });
     }
 });
 
 // Route để xem thông tin bandwidth
 app.get('/api/bandwidth-info', (req, res) => {
-    const uptimeHours = (Date.now() - bandwidthStats.startTime.getTime()) / (1000 * 60 * 60);
-    const uptimeDays = uptimeHours / 24;
+    const uptimeSeconds = process.uptime();
+    const uptimeMinutes = uptimeSeconds / 60;
     
     res.json({
         bandwidth_usage: {
-            total_requests: bandwidthStats.totalRequests,
-            total_bytes_in: bandwidthStats.totalBytesIn,
-            total_bytes_out: bandwidthStats.totalBytesOut,
-            total_bytes_in_mb: (bandwidthStats.totalBytesIn / 1024 / 1024).toFixed(2),
-            total_bytes_out_mb: (bandwidthStats.totalBytesOut / 1024 / 1024).toFixed(2),
-            total_bandwidth_mb: ((bandwidthStats.totalBytesIn + bandwidthStats.totalBytesOut) / 1024 / 1024).toFixed(2),
-            render_monthly_limit_gb: 100,
-            estimated_monthly_usage_gb: uptimeDays > 0 ? 
-                (((bandwidthStats.totalBytesIn + bandwidthStats.totalBytesOut) / 1024 / 1024 / 1024) * (30 / uptimeDays)).toFixed(3) : 0
+            session_requests: bandwidthStats.totalRequests,
+            session_bytes_in: bandwidthStats.totalBytesIn,
+            session_bytes_out: bandwidthStats.totalBytesOut,
+            session_bytes_in_kb: (bandwidthStats.totalBytesIn / 1024).toFixed(2),
+            session_bytes_out_kb: (bandwidthStats.totalBytesOut / 1024).toFixed(2),
+            total_bandwidth_kb: ((bandwidthStats.totalBytesIn + bandwidthStats.totalBytesOut) / 1024).toFixed(2),
+            vercel_monthly_limit_gb: 100
         },
-        statistics: {
-            uptime_hours: uptimeHours.toFixed(2),
-            uptime_days: uptimeDays.toFixed(2),
-            average_request_size_kb: bandwidthStats.totalRequests > 0 ? 
-                ((bandwidthStats.totalBytesIn + bandwidthStats.totalBytesOut) / bandwidthStats.totalRequests / 1024).toFixed(2) : 0,
-            requests_per_hour: uptimeHours > 0 ? (bandwidthStats.totalRequests / uptimeHours).toFixed(2) : 0
+        serverless_info: {
+            function_uptime_seconds: uptimeSeconds.toFixed(2),
+            function_uptime_minutes: uptimeMinutes.toFixed(2),
+            note: "Stats reset on each function cold start"
         },
-        recent_requests: bandwidthStats.requestsLog.slice(-10), // Last 10 requests
+        recent_requests: bandwidthStats.requestsLog.slice(-5), // Last 5 requests
         tracking_since: bandwidthStats.startTime.toISOString()
     });
 });
@@ -207,39 +166,28 @@ app.post('/api/bandwidth-reset', (req, res) => {
 
 // Route tổng hợp tất cả system info
 app.get('/api/system-info', (req, res) => {
-    const os = require('os');
-    
     res.json({
         server_info: {
+            platform: "Vercel Serverless",
             node_version: process.version,
-            platform: os.platform(),
-            architecture: os.arch(),
-            uptime_seconds: process.uptime(),
-            uptime_minutes: (process.uptime() / 60).toFixed(2),
-            uptime_hours: (process.uptime() / 3600).toFixed(2)
+            architecture: process.arch,
+            function_uptime_seconds: process.uptime(),
+            vercel_region: process.env.VERCEL_REGION || 'auto'
         },
         memory_info: {
-            total_memory_gb: (os.totalmem() / 1024 / 1024 / 1024).toFixed(2),
-            free_memory_gb: (os.freemem() / 1024 / 1024 / 1024).toFixed(2),
-            used_memory_gb: ((os.totalmem() - os.freemem()) / 1024 / 1024 / 1024).toFixed(2),
-            process_memory_mb: {
-                rss: (process.memoryUsage().rss / 1024 / 1024).toFixed(2),
-                heap_used: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
-                heap_total: (process.memoryUsage().heapTotal / 1024 / 1024).toFixed(2)
-            }
+            function_memory_mb: (process.memoryUsage().rss / 1024 / 1024).toFixed(2),
+            heap_used_mb: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
+            heap_total_mb: (process.memoryUsage().heapTotal / 1024 / 1024).toFixed(2),
+            vercel_memory_limit: "1024 MB (Hobby plan)"
         },
-        cpu_info: {
-            cpu_count: os.cpus().length,
-            cpu_model: os.cpus()[0].model,
-            load_average: os.loadavg()
-        },
-        render_specs: {
-            free_plan: {
-                ram: "512 MB",
-                cpu: "0.1 vCPU (shared)",
-                disk: "1 GB SSD",
+        vercel_specs: {
+            hobby_plan: {
+                function_memory: "1024 MB",
+                function_timeout: "30 seconds",
                 bandwidth: "100 GB/month",
-                notes: "Sleeps after 15 minutes of inactivity"
+                functions: "Unlimited",
+                domains: "Unlimited",
+                serverless_function_size: "50 MB"
             }
         },
         quick_links: {
@@ -254,14 +202,18 @@ app.get('/api/system-info', (req, res) => {
 app.use('*', (req, res) => {
     res.status(404).json({
         error: 'Endpoint không tồn tại',
-        path: req.originalUrl
+        path: req.originalUrl,
+        platform: 'Vercel'
     });
 });
 
-// Khởi động server
-app.listen(PORT, () => {
-    console.log(`🚀 Server đang chạy trên port ${PORT}`);
-    console.log(`🌐 Truy cập: http://localhost:${PORT}`);
-});
+// Chỉ khởi động server khi chạy local (không phải trên Vercel)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`🚀 Server đang chạy trên port ${PORT}`);
+        console.log(`🌐 Truy cập: http://localhost:${PORT}`);
+    });
+}
 
+// Export app cho Vercel
 module.exports = app;
