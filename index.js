@@ -12,7 +12,7 @@ app.get('/', (req, res) => {
     res.json({
         message: 'Chào mừng đến với ứng dụng Node.js của tôi!',
         status: 'success',
-        platform: 'Vercel',
+        platform: 'Railway',
         timestamp: new Date().toISOString()
     });
 });
@@ -23,7 +23,7 @@ app.get('/api/health', (req, res) => {
         status: 'healthy',
         uptime: process.uptime(),
         memory: process.memoryUsage(),
-        platform: 'Vercel Serverless'
+        platform: 'Railway'
     });
 });
 
@@ -90,26 +90,27 @@ app.use((req, res, next) => {
     next();
 });
 
-// Route để xem thông tin disk (Simplified for Vercel)
+// Route để xem thông tin disk (Railway)
 app.get('/api/disk-info', async (req, res) => {
     try {
-        // Simplified disk info for serverless environment
+        // Railway disk info
         res.json({
             disk_usage: {
-                note: "Vercel uses serverless functions - no persistent disk storage",
-                function_memory_limit: "1024 MB",
-                function_timeout: "30 seconds (Hobby plan)",
-                vercel_limits: {
-                    function_size: "50 MB",
-                    deployment_size: "100 MB",
-                    bandwidth: "100 GB/month"
+                note: "Railway provides persistent disk storage",
+                disk_limit: "1 GB (Starter plan)",
+                ram_limit: "512 MB",
+                railway_limits: {
+                    monthly_usage: "$5 credit/month",
+                    disk_size: "1 GB",
+                    bandwidth: "Unlimited"
                 }
             },
             system_info: {
                 platform: process.platform,
                 architecture: process.arch,
                 node_version: process.version,
-                vercel_region: process.env.VERCEL_REGION || 'unknown'
+                railway_environment: process.env.RAILWAY_ENVIRONMENT || 'unknown',
+                railway_service: process.env.RAILWAY_SERVICE_NAME || 'unknown'
             },
             memory_usage: process.memoryUsage()
         });
@@ -136,12 +137,12 @@ app.get('/api/bandwidth-info', (req, res) => {
             session_bytes_in_kb: (bandwidthStats.totalBytesIn / 1024).toFixed(2),
             session_bytes_out_kb: (bandwidthStats.totalBytesOut / 1024).toFixed(2),
             total_bandwidth_kb: ((bandwidthStats.totalBytesIn + bandwidthStats.totalBytesOut) / 1024).toFixed(2),
-            vercel_monthly_limit_gb: 100
+            railway_bandwidth_limit: "Unlimited"
         },
-        serverless_info: {
-            function_uptime_seconds: uptimeSeconds.toFixed(2),
-            function_uptime_minutes: uptimeMinutes.toFixed(2),
-            note: "Stats reset on each function cold start"
+        railway_info: {
+            app_uptime_seconds: uptimeSeconds.toFixed(2),
+            app_uptime_minutes: uptimeMinutes.toFixed(2),
+            note: "Persistent container - stats maintained across requests"
         },
         recent_requests: bandwidthStats.requestsLog.slice(-5), // Last 5 requests
         tracking_since: bandwidthStats.startTime.toISOString()
@@ -168,26 +169,27 @@ app.post('/api/bandwidth-reset', (req, res) => {
 app.get('/api/system-info', (req, res) => {
     res.json({
         server_info: {
-            platform: "Vercel Serverless",
+            platform: "Railway",
             node_version: process.version,
             architecture: process.arch,
-            function_uptime_seconds: process.uptime(),
-            vercel_region: process.env.VERCEL_REGION || 'auto'
+            app_uptime_seconds: process.uptime(),
+            railway_environment: process.env.RAILWAY_ENVIRONMENT || 'unknown',
+            railway_service: process.env.RAILWAY_SERVICE_NAME || 'unknown'
         },
         memory_info: {
-            function_memory_mb: (process.memoryUsage().rss / 1024 / 1024).toFixed(2),
+            app_memory_mb: (process.memoryUsage().rss / 1024 / 1024).toFixed(2),
             heap_used_mb: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
             heap_total_mb: (process.memoryUsage().heapTotal / 1024 / 1024).toFixed(2),
-            vercel_memory_limit: "1024 MB (Hobby plan)"
+            railway_memory_limit: "512 MB (Starter plan)"
         },
-        vercel_specs: {
-            hobby_plan: {
-                function_memory: "1024 MB",
-                function_timeout: "30 seconds",
-                bandwidth: "100 GB/month",
-                functions: "Unlimited",
-                domains: "Unlimited",
-                serverless_function_size: "50 MB"
+        railway_specs: {
+            starter_plan: {
+                memory: "512 MB",
+                disk: "1 GB",
+                bandwidth: "Unlimited",
+                monthly_usage: "$5 credit",
+                custom_domains: "Yes",
+                persistent_storage: "Yes"
             }
         },
         quick_links: {
@@ -203,17 +205,17 @@ app.use('*', (req, res) => {
     res.status(404).json({
         error: 'Endpoint không tồn tại',
         path: req.originalUrl,
-        platform: 'Vercel'
+        platform: 'Railway'
     });
 });
 
-// Chỉ khởi động server khi chạy local (không phải trên Vercel)
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-    app.listen(PORT, () => {
-        console.log(`🚀 Server đang chạy trên port ${PORT}`);
-        console.log(`🌐 Truy cập: http://localhost:${PORT}`);
-    });
-}
+// Khởi động server cho Railway
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`� Server đang chạy trên Railway port ${PORT}`);
+    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🚀 Railway Environment: ${process.env.RAILWAY_ENVIRONMENT || 'local'}`);
+    console.log(`📡 Railway Service: ${process.env.RAILWAY_SERVICE_NAME || 'unknown'}`);
+    console.log(`⏰ Started at: ${new Date().toISOString()}`);
+});
 
-// Export app cho Vercel
 module.exports = app;

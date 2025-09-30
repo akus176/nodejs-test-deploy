@@ -1,19 +1,22 @@
 {
-  "name": "nodejs-render-app",
+  "name": "nodejs-test-deploy",
   "version": "1.0.0",
-  "description": "Ứng dụng Node.js đơn giản để deploy lên Render",
+  "description": "Simple Node.js app for Railway deployment",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js"
+    "dev": "nodemon index.js"
   },
-  "keywords": ["nodejs", "express", "render"],
+  "keywords": ["nodejs", "express", "railway", "deployment"],
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2"
   },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0"
   }
 }
